@@ -24,10 +24,10 @@ THEME_PACKAGE = {"source": "npm:@sherif-fanous/pi-catppuccin@0.3.0", "themes": [
 # Registry packages this setup installed before and now drops; install removes them from settings.
 # pi-curated-themes shipped a catppuccin-mocha with off-palette accents; pi-secret-drop is now part of pi-robot-hand;
 # the npm pi-herdr-agents release is replaced by the fork pin above, and pi must never load both.
-# Straw Boss on pi moved from the straw-boss git repository to the pi-straw-boss npm package; pi-web-access is no longer used;
+# Straw Boss on pi moved from the straw-boss git repository to the pi-straw-boss npm package;
 # pi-ask-user gave way to rpiv-ask-user-question, whose answer channel lets pi-straw-boss answer from the browser.
 RETIRED_SOURCES = ("npm:@victor-software-house/pi-curated-themes", "npm:pi-secret-drop", "npm:pi-herdr-agents",
-                   "git:github.com/wayne930242/straw-boss", "npm:pi-web-access", "npm:pi-ask-user",
+                   "git:github.com/wayne930242/straw-boss", "npm:pi-ask-user",
                    "git:github.com/wayne930242/pi-quotas",
                    # It kept a full gzip copy of the session on every checkpoint with no retention: 192 GB in a month.
                    "npm:@moyai/pi-session-hoarder",
@@ -60,6 +60,8 @@ PACKAGES = [
     "npm:pi-robot-hand@0.3.2",
     "npm:pi-auto-tab-name@0.2.0",
     "npm:pi-herdr-doc-review@0.7.0",
+    # web_search, fetch_content, and source_check: web research with provider fallback (kept in this fork; upstream retired it).
+    "npm:pi-web-access@0.45.0",
     # Straw Boss coordination in Herdr: opt-in main agents per tab, an on-demand tower per workspace, scoped broadcast.
     "npm:pi-straw-boss@0.43.2",
     "npm:@pify/memory@0.14.0",

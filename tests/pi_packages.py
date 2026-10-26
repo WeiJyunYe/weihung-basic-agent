@@ -178,14 +178,14 @@ class PackageTests(unittest.TestCase):
             state.pop("previous_ui_settings_present")
             marker.write_text(json.dumps(state))
             current = json.loads(settings.read_text())
-            current["packages"] = ["npm:user-package", "npm:pi-lens", "npm:pi-web-access@0.31.0"]
+            current["packages"] = ["npm:user-package", "npm:pi-lens", "npm:pi-phoenix-otel@0.3.0"]
             current.pop("enableInstallTelemetry")
             settings.write_text(json.dumps(current))
             run_script("install.sh", home, "--skip-external")
             upgraded = json.loads(settings.read_text())
             sources = [item["source"] if isinstance(item, dict) else item for item in upgraded["packages"]]
             self.assertEqual([item for item in sources if "pi-lens" in item], ["npm:pi-lens@4.4.5"])
-            self.assertEqual([item for item in sources if "pi-web-access" in item], [], "a retired package is removed")
+            self.assertEqual([item for item in sources if "pi-phoenix-otel" in item], [], "a retired package is removed")
             self.assertIs(upgraded["enableInstallTelemetry"], False)
             run_script("uninstall.sh", home, "--skip-external")
             restored = json.loads(settings.read_text())
