@@ -206,7 +206,10 @@ def apply(ctx: Context) -> None:
         retired_ids.add(package_id(str(overlay), agent_dir))
     pinned = owned_packages(state)
     if not ctx.skip_external:
-        external.run(["npm", "install", "-g", "@earendil-works/pi-coding-agent@latest"], home)
+        # pi's own installer keeps pi in agent_dir/install and updates it with `pi update --self`; a second npm copy
+        # would sit beside it at another version, so only a machine without that install gets pi from npm.
+        if not (agent_dir / "install/current-version").is_file():
+            external.run(["npm", "install", "-g", "@earendil-works/pi-coding-agent@latest"], home)
         if "playwriter_preinstalled" not in state:
             listed = subprocess.run(["npm", "ls", "-g", "--depth=0", "playwriter"], capture_output=True, check=False)
             state["playwriter_preinstalled"] = listed.returncode == 0

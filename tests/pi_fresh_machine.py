@@ -107,6 +107,13 @@ esac
     assert f"install {STRAW_BOSS}" in calls.read_text().splitlines()
     assert STRAW_BOSS in json.loads((agent / "settings.json").read_text())["packages"]
     assert "install -g playwriter@0.9.0" in npm_calls.read_text().splitlines()
+    pi_from_npm = "install -g @earendil-works/pi-coding-agent@latest"
+    assert npm_calls.read_text().splitlines().count(pi_from_npm) == 1
+    # A pi from pi's own installer stays the only pi: no npm copy is added beside it.
+    write(agent / "install/current-version", "1.4.0\n")
+    run("install.sh", home, env)
+    assert npm_calls.read_text().splitlines().count(pi_from_npm) == 1
+    (agent / "install/current-version").unlink()
     # Each Herdr plugin is installed at its pinned tag, once: a second install finds them there.
     plugin_installs = [f"plugin install {repo} --ref {ref} --yes" for _, repo, ref in HERDR_PLUGINS]
     assert [line for line in herdr_calls.read_text().splitlines() if line.startswith("plugin ") and line != "plugin list"] == plugin_installs
