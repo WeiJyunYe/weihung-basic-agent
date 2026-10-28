@@ -1,6 +1,6 @@
 """Every pinned package source; `scripts/pi-pins.py` rewrites the versions in this file, so it imports nothing."""
 
-BRIDGE_SOURCE = "git:github.com/wayne930242/pi-claude-bridge@cf8c6e1035681bc12c2499c0a6c2edd273a444eb"
+BRIDGE_SOURCE = "git:github.com/wayne930242/pi-claude-bridge@9822631a50f0400713d9f769faad670c90b2a33b"
 QUOTAS_SOURCE = "npm:@latentminds/pi-quotas@0.5.0"
 CLAUDE_RULES_SOURCE = "npm:pi-code@1.6.1"
 # Fork pin of giuseppecrj/pi-herdr-agents: upstream v3.3.1 plus PRs #84, #95, and #99, the solutionSpace change of
@@ -59,11 +59,11 @@ PACKAGES = [
     "npm:pi-codex-image-gen@0.2.0",
     "npm:pi-robot-hand@0.3.2",
     "npm:pi-auto-tab-name@0.2.0",
-    "npm:pi-herdr-doc-review@0.7.0",
+    "npm:pi-herdr-doc-review@0.11.1",
     # web_search, fetch_content, and source_check: web research with provider fallback (kept in this fork; upstream retired it).
     "npm:pi-web-access@0.45.0",
     # Straw Boss coordination in Herdr: opt-in main agents per tab, an on-demand tower per workspace, scoped broadcast.
-    "npm:pi-straw-boss@0.43.2",
+    "npm:pi-straw-boss@0.46.0",
     "npm:@pify/memory@0.14.0",
     "npm:pi-loop-monitor@0.2.8",
     "npm:@narumitw/pi-goal@0.54.13",
@@ -78,12 +78,12 @@ PACKAGES = [
 # bump a tag when that folder changes. herdr-plugin is the sidebar's net view (prefix+alt+n); herdr-reaper closes the
 # panes agents leave in worktree workspaces, removes their clean checkouts, and keeps pinned workspaces (prefix+P).
 HERDR_PLUGINS = (
-    ("wayne930242.straw-boss", "wayne930242/pi-straw-boss/herdr-plugin", "v0.9.4", "straw_boss_plugin_preinstalled"),
-    ("wayne930242.straw-boss-reaper", "wayne930242/pi-straw-boss/herdr-reaper", "v0.39.0", "reaper_plugin_preinstalled"),
+    ("wayne930242.straw-boss", "wayne930242/pi-straw-boss/herdr-plugin", "v0.46.0", "straw_boss_plugin_preinstalled"),
+    ("wayne930242.straw-boss-reaper", "wayne930242/pi-straw-boss/herdr-reaper", "v0.46.0", "reaper_plugin_preinstalled"),
 )
 # The Playwriter CLI drives the user's own Chrome through its extension; playwriter-relay.ts starts its relay.
 PLAYWRITER = "playwriter@0.9.0"
 # thesis-toolkit launches the research-hub MCP server (literature search, open-access download, bibliography saves).
 THESIS_TOOLKIT = "thesis-toolkit@0.1.3"
 # anchorloop, the workflow skills and extensions; PI_ANCHORLOOP_ROOT swaps in a checkout for testing.
-ANCHORLOOP_PACKAGE = "npm:pi-anchorloop@2.0.2"
+ANCHORLOOP_PACKAGE = "npm:pi-anchorloop@2.1.1"
