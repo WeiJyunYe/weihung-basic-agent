@@ -17,7 +17,7 @@ from support.pi import fake_npm_install, run_script
 class PackageTests(unittest.TestCase):
     def test_package_identity_ignores_the_npm_version(self):
         agent = Path("/unused")
-        self.assertEqual(packages.package_id("npm:pi-lens@4.4.5", agent), "npm:pi-lens")
+        self.assertEqual(packages.package_id("npm:pi-lens@4.4.7", agent), "npm:pi-lens")
         self.assertEqual(packages.package_id("npm:@scope/name@1.0.0", agent), "npm:@scope/name")
         self.assertEqual(packages.package_id("npm:@scope/name", agent), "npm:@scope/name")
         self.assertEqual(packages.package_id({"source": "npm:pi-lens", "skills": []}, agent), "npm:pi-lens")
@@ -34,7 +34,7 @@ class PackageTests(unittest.TestCase):
             with mock.patch.dict("os.environ", unset, clear=True):
                 run_script("install.sh", home, "--skip-external")
             installed = json.loads((agent / "settings.json").read_text())["packages"]
-            self.assertEqual([item for item in installed if "aaaav" in item or "anchorloop" in item], ["npm:pi-anchorloop@2.1.1"])
+            self.assertEqual([item for item in installed if "aaaav" in item or "anchorloop" in item], ["npm:pi-anchorloop@2.6.0"])
 
     def test_the_pi_aaaav_package_gives_way_to_pi_anchorloop(self):
         earlier = "npm:pi-aaaav@1.3.4"
@@ -48,7 +48,7 @@ class PackageTests(unittest.TestCase):
             with mock.patch.dict("os.environ", unset, clear=True):
                 run_script("install.sh", home, "--skip-external")
             installed = json.loads((agent / "settings.json").read_text())["packages"]
-            self.assertEqual([item for item in installed if "aaaav" in item or "anchorloop" in item], ["npm:pi-anchorloop@2.1.1"])
+            self.assertEqual([item for item in installed if "aaaav" in item or "anchorloop" in item], ["npm:pi-anchorloop@2.6.0"])
 
     def test_an_aaaav_git_install_the_state_never_recorded_is_removed_too(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -61,7 +61,7 @@ class PackageTests(unittest.TestCase):
             with mock.patch.dict("os.environ", unset, clear=True):
                 run_script("install.sh", home, "--skip-external")
             installed = json.loads((agent / "settings.json").read_text())["packages"]
-            self.assertEqual([item for item in installed if "aaaav" in item or "anchorloop" in item], ["npm:pi-anchorloop@2.1.1"])
+            self.assertEqual([item for item in installed if "aaaav" in item or "anchorloop" in item], ["npm:pi-anchorloop@2.6.0"])
 
     def test_session_hoarder_leaves_a_machine_that_already_installed_it(self):
         hoarder = "npm:@moyai/pi-session-hoarder@0.2.0"
@@ -99,7 +99,7 @@ class PackageTests(unittest.TestCase):
                 self.assertEqual(packages.anchorloop_source(), str(checkout.resolve()))
         unset = {key: value for key, value in os.environ.items() if key != "PI_ANCHORLOOP_ROOT"}
         with mock.patch.dict("os.environ", unset, clear=True):
-            self.assertEqual(packages.anchorloop_source(), "npm:pi-anchorloop@2.1.1")
+            self.assertEqual(packages.anchorloop_source(), "npm:pi-anchorloop@2.6.0")
 
     def test_leaving_a_checkout_override_removes_the_checkout(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -112,13 +112,13 @@ class PackageTests(unittest.TestCase):
             (agent / "settings.json").write_text("{}")
             run_script("install.sh", home, "--skip-external", env={"PI_ANCHORLOOP_ROOT": str(checkout)})
             first = json.loads((agent / "settings.json").read_text())["packages"]
-            self.assertNotIn("npm:pi-anchorloop@2.1.1", first)
+            self.assertNotIn("npm:pi-anchorloop@2.6.0", first)
             self.assertTrue(any("anchorloop" in item for item in first), first)
             unset = {key: value for key, value in os.environ.items() if key != "PI_ANCHORLOOP_ROOT"}
             with mock.patch.dict("os.environ", unset, clear=True):
                 run_script("install.sh", home, "--skip-external")
             second = json.loads((agent / "settings.json").read_text())["packages"]
-            self.assertEqual([item for item in second if "anchorloop" in item], ["npm:pi-anchorloop@2.1.1"])
+            self.assertEqual([item for item in second if "anchorloop" in item], ["npm:pi-anchorloop@2.6.0"])
 
     def test_retired_theme_package_is_replaced_and_restored(self):
         old = {"source": "npm:@victor-software-house/pi-curated-themes@0.2.1", "themes": ["themes/catppuccin-mocha.json"], "skills": []}
@@ -184,7 +184,7 @@ class PackageTests(unittest.TestCase):
             run_script("install.sh", home, "--skip-external")
             upgraded = json.loads(settings.read_text())
             sources = [item["source"] if isinstance(item, dict) else item for item in upgraded["packages"]]
-            self.assertEqual([item for item in sources if "pi-lens" in item], ["npm:pi-lens@4.4.5"])
+            self.assertEqual([item for item in sources if "pi-lens" in item], ["git:github.com/wayne930242/pi-lens@96ccbc4d16fce06956bec621a7ff327e1c8545cb"])
             self.assertEqual([item for item in sources if "pi-phoenix-otel" in item], [], "a retired package is removed")
             self.assertIs(upgraded["enableInstallTelemetry"], False)
             run_script("uninstall.sh", home, "--skip-external")
@@ -265,7 +265,7 @@ class PackageTests(unittest.TestCase):
             home = Path(directory)
             agent = home / ".pi/agent"
             (agent / "npm").mkdir(parents=True)
-            (agent / "npm/package.json").write_text(json.dumps({"dependencies": {"pi-phoenix-otel": "^0.2.0", "pi-lens": "^4.4.3"}}))
+            (agent / "npm/package.json").write_text(json.dumps({"dependencies": {"pi-phoenix-otel": "^0.2.0", "pi-intercom": "^0.18.0"}}))
             quotas = agent / "git/github.com/wayne930242/pi-quotas"
             quotas.mkdir(parents=True)
             settings = agent / "settings.json"

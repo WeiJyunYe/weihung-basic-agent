@@ -13,10 +13,16 @@ HERDR_AGENTS_SOURCE = "git:github.com/wayne930242/pi-herdr-agents@19ba73e7f96c73
 # skills/orchestrate owns our trimmed version. Pinned by hand (MANUAL_PINS) since a 0.x bump can change the planner.
 HERDR_ROLES_SOURCE = "npm:pi-herdr-roles@0.1.0"
 HERDR_ROLES_PACKAGE = {"source": HERDR_ROLES_SOURCE, "skills": ["!orchestrate"]}
+# Fork pin of apmantza/pi-lens: upstream master 58c0c95 plus the `dispatch.disabledRunners` config key (branch
+# feat/dispatch-disabled-runners, apmantza/pi-lens#5011), which configs.LENS_DISABLED_RUNNERS needs to keep dotnet-build off.
+# Once upstream releases it, return to npm:pi-lens@<version>, drop the PINNED_GIT and FORK_BRANCHES entries, and take
+# "npm:pi-lens" out of RETIRED_SOURCES.
+LENS_SOURCE = "git:github.com/wayne930242/pi-lens@96ccbc4d16fce06956bec621a7ff327e1c8545cb"
 # Every other revision of a pinned git package, including an unpinned spec, is retired for the current pin.
 PINNED_GIT = {
     BRIDGE_SOURCE: ("git:github.com/wayne930242/pi-claude-bridge@",),
     HERDR_AGENTS_SOURCE: ("git:github.com/wayne930242/pi-herdr-agents",),
+    LENS_SOURCE: ("git:github.com/wayne930242/pi-lens",),
 }
 # Versioned specs keep every machine on the same release; `pi update` skips them, so bump them here.
 # Catppuccin Mocha with only official palette colors, matching Herdr, Ghostty, and SketchyBar; the filter loads Mocha alone.
@@ -36,7 +42,9 @@ RETIRED_SOURCES = ("npm:@victor-software-house/pi-curated-themes", "npm:pi-secre
                    # pi-aaaav was renamed pi-anchorloop at 2.0.0.
                    "npm:pi-aaaav",
                    # Phoenix traces saw little use; the package and its local Phoenix server were retired.
-                   "npm:pi-phoenix-otel")
+                   "npm:pi-phoenix-otel",
+                   # The npm pi-lens release is replaced by the fork pin LENS_SOURCE; pi must never load both.
+                   "npm:pi-lens")
 # pi-code loads only claude-rules.ts, which reads each project's .claude/rules as Claude Code does;
 # its other extensions duplicate the todo, MCP, subagent, and web packages below.
 CLAUDE_RULES_PACKAGE = {"source": CLAUDE_RULES_SOURCE, "extensions": ["extensions/claude-rules.ts"]}
@@ -49,21 +57,21 @@ PACKAGES = [
     "npm:@juicesharp/rpiv-ask-user-question@2.15.0",
     "npm:@juicesharp/rpiv-todo@2.15.0",
     THEME_PACKAGE,
-    "npm:pi-open-tui@0.3.12",
-    "npm:pi-lens@4.4.5",
+    "npm:pi-open-tui@0.3.14",
+    LENS_SOURCE,
     QUOTAS_SOURCE,
     "npm:pi-jev-compaction@1.0.0",
     # prose_watch: an AI-tone check (Jev) on the prose files a writing task arms.
     "npm:pi-prose-watch@0.1.2",
-    "npm:cc-safety-net@2.6.19",
-    "npm:pi-codex-image-gen@0.2.0",
-    "npm:pi-robot-hand@0.3.2",
+    "npm:cc-safety-net@2.7.1",
+    "npm:pi-codex-image-gen@0.3.0",
+    "npm:pi-robot-hand@0.4.0",
     "npm:pi-auto-tab-name@0.2.0",
-    "npm:pi-herdr-doc-review@0.11.1",
+    "npm:pi-herdr-doc-review@0.11.2",
     # web_search, fetch_content, and source_check: web research with provider fallback (kept in this fork; upstream retired it).
-    "npm:pi-web-access@0.45.0",
+    "npm:pi-web-access@0.46.0",
     # Straw Boss coordination in Herdr: opt-in main agents per tab, an on-demand tower per workspace, scoped broadcast.
-    "npm:pi-straw-boss@0.46.0",
+    "npm:pi-straw-boss@0.52.0",
     "npm:@pify/memory@0.14.0",
     "npm:pi-loop-monitor@0.2.8",
     "npm:@narumitw/pi-goal@0.54.13",
@@ -78,12 +86,12 @@ PACKAGES = [
 # bump a tag when that folder changes. herdr-plugin is the sidebar's net view (prefix+alt+n); herdr-reaper closes the
 # panes agents leave in worktree workspaces, removes their clean checkouts, and keeps pinned workspaces (prefix+P).
 HERDR_PLUGINS = (
-    ("wayne930242.straw-boss", "wayne930242/pi-straw-boss/herdr-plugin", "v0.46.0", "straw_boss_plugin_preinstalled"),
-    ("wayne930242.straw-boss-reaper", "wayne930242/pi-straw-boss/herdr-reaper", "v0.46.0", "reaper_plugin_preinstalled"),
+    ("wayne930242.straw-boss", "wayne930242/pi-straw-boss/herdr-plugin", "v0.50.0", "straw_boss_plugin_preinstalled"),
+    ("wayne930242.straw-boss-reaper", "wayne930242/pi-straw-boss/herdr-reaper", "v0.50.0", "reaper_plugin_preinstalled"),
 )
 # The Playwriter CLI drives the user's own Chrome through its extension; playwriter-relay.ts starts its relay.
 PLAYWRITER = "playwriter@0.9.0"
 # thesis-toolkit launches the research-hub MCP server (literature search, open-access download, bibliography saves).
 THESIS_TOOLKIT = "thesis-toolkit@0.1.3"
 # anchorloop, the workflow skills and extensions; PI_ANCHORLOOP_ROOT swaps in a checkout for testing.
-ANCHORLOOP_PACKAGE = "npm:pi-anchorloop@2.1.1"
+ANCHORLOOP_PACKAGE = "npm:pi-anchorloop@2.6.0"

@@ -7,7 +7,7 @@ from pathlib import Path
 from .context import Context, State
 from .jsonfile import read_json, write_json
 from .managed import record_keys, remember_keys, restore_keys, restore_nested, restore_value
-from .paths import COMPUTER_USE_CONFIG, HERDR_MODELS, LENS_CONFIG, OPEN_TUI_CONFIG, RETIRED_ROLES_DIR
+from .paths import COMPUTER_USE_CONFIG, HERDR_MODELS, LENS_CONFIG, OPEN_TUI_CONFIG, RETIRED_ROLES_DIR, overlay_root
 from .pins import THESIS_TOOLKIT
 
 # pi's native compaction fires at contextWindow - reserveTokens: 500K for the 1M Opus and Sonnet, a
@@ -33,6 +33,9 @@ RESEARCH_HUB_SERVER = {
 BUILTIN_MCP_OFF = "-builtin:mcp"
 # These pi-lens tools stay off to keep every prompt small; `read_symbol`, `read_enclosing`, and `lens_diagnostics` cover navigation.
 LENS_DISABLED_TOOLS = ("project_report", "symbol_search", "module_report")
+# pi-lens dispatch runners kept off: dotnet-build ran a full `dotnet build` after a .cs edit whenever csharp-ls did not
+# answer; the C# language server still checks each edit. The key comes from the fork pin (apmantza/pi-lens PR).
+LENS_DISABLED_RUNNERS = ("dotnet-build",)
 # pi-herdr-agents falls back to its config.json.example only while config.json is missing; once this install creates the
 # file, `status` is required, so a fresh machine gets the example's value (the other example sections have defaults).
 HERDR_STATUS = {"enabled": True}
@@ -134,6 +137,55 @@ def restore_herdr_models(ctx: Context) -> None:
     write_or_remove(ctx.herdr_config_path, config)
 
 
+def overlay_model_providers() -> dict:
+    """The providers the overlay's pi/models.json declares, or none without an overlay or that file."""
+    root = overlay_root()
+    return read_json(root / "pi/models.json").get("providers", {}) if root else {}
+
+
+def apply_overlay_models(ctx: Context) -> None:
+    """Merge the overlay's model providers into ~/.pi/agent/models.json; a provider edited by hand stops the run."""
+    state = ctx.state
+    path = ctx.agent_dir / "models.json"
+    config = read_json(path)
+    providers = config.get("providers", {})
+    installed = state.get("installed_model_providers", {})
+    previous = state.setdefault("previous_model_providers", {})
+    desired = overlay_model_providers()
+    for name, value in desired.items():
+        current = providers.get(name)
+        if current not in (None, value, installed.get(name)) and not ctx.force:
+            raise ValueError(f"{path} provider `{name}` differs from the overlay's pi/models.json; move the change into "
+                             "the overlay, or rerun with --force to replace it")
+        if name not in installed:
+            previous.setdefault(name, deepcopy(current))
+        providers[name] = deepcopy(value)
+    # A provider the overlay dropped goes back to what it replaced, while it still holds what install wrote.
+    for name in set(installed) - set(desired):
+        restore_value(providers, name, installed[name], previous.pop(name, None))
+    if providers:
+        config["providers"] = providers
+    else:
+        config.pop("providers", None)
+    write_or_remove(path, config)
+    state["installed_model_providers"] = deepcopy(desired)
+
+
+def restore_overlay_models(ctx: Context) -> None:
+    state = ctx.state
+    path = ctx.agent_dir / "models.json"
+    config = read_json(path)
+    providers = config.get("providers", {})
+    previous = state.get("previous_model_providers", {})
+    for name, value in state.get("installed_model_providers", {}).items():
+        restore_value(providers, name, value, previous.get(name))
+    if providers:
+        config["providers"] = providers
+    else:
+        config.pop("providers", None)
+    write_or_remove(path, config)
+
+
 def disable_builtin_mcp(settings: dict, state: State) -> None:
     extensions = settings.get("extensions")
     state.setdefault("previous_extensions_present", extensions is not None)
@@ -208,22 +260,28 @@ def apply_lens(ctx: Context) -> None:
     state.setdefault("previous_lens_tools", {name: deepcopy(tools[name]) for name in LENS_DISABLED_TOOLS if name in tools})
     for name in LENS_DISABLED_TOOLS:
         tools[name] = {**tools.get(name, {}), "enabled": False}
+    dispatch = config.setdefault("dispatch", {})
+    state.setdefault("previous_lens_dispatch", {key: deepcopy(dispatch[key]) for key in ("disabledRunners",) if key in dispatch})
+    runners = list(dispatch.get("disabledRunners") or [])
+    dispatch["disabledRunners"] = runners + [runner for runner in LENS_DISABLED_RUNNERS if runner not in runners]
     write_json(path, config)
     state["installed_lens_tools"] = {name: deepcopy(tools[name]) for name in LENS_DISABLED_TOOLS}
+    state["installed_lens_dispatch"] = {"disabledRunners": deepcopy(dispatch["disabledRunners"])}
 
 
 def restore_lens(ctx: Context) -> None:
     state = ctx.state
     path = ctx.home / LENS_CONFIG
     config = read_json(path)
+    if "installed_lens_dispatch" in state:
+        restore_nested(config, "dispatch", state["installed_lens_dispatch"], state.get("previous_lens_dispatch"), ("disabledRunners",))
     tools = config.get("tools")
-    if not isinstance(tools, dict) or "installed_lens_tools" not in state:
-        return
-    previous = state.get("previous_lens_tools", {})
-    for name, installed in state["installed_lens_tools"].items():
-        restore_nested(tools, name, installed, previous.get(name), ("enabled",))
-    if not tools:
-        config.pop("tools")
+    if isinstance(tools, dict) and "installed_lens_tools" in state:
+        previous = state.get("previous_lens_tools", {})
+        for name, installed in state["installed_lens_tools"].items():
+            restore_nested(tools, name, installed, previous.get(name), ("enabled",))
+        if not tools:
+            config.pop("tools")
     write_or_remove(path, config)
 
 
