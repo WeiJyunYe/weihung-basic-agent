@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PINNED_SPEC = "git:github.com/wayne930242/pi-herdr-agents@19ba73e7f96c73a028d8657e6291cdc5a3bf830e"
+PINNED_SPEC = "git:github.com/wayne930242/pi-herdr-agents@6f530b9653db1183ad6e4100b3a34cd5e2427fe8"
 RETIRED_NPM = "npm:pi-herdr-agents@2.0.4"
 VARIABLE = "PI_HERDR_AGENTS_ROOT"
 
@@ -23,6 +23,8 @@ def checkout(base, name="pi-herdr-agents", package="pi-herdr-agents"):
 def run_script(script, home, *args, override=None, check=True, bin_dir=None):
     env = {key: value for key, value in os.environ.items() if key != VARIABLE}
     env["HOME"] = str(home)
+    # macOS's /usr/bin/python3 caches bytecode under $HOME/Library, which would read as the install writing to home.
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     if override is not None:
         env[VARIABLE] = str(override)
     if bin_dir:

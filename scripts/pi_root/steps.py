@@ -4,7 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import NamedTuple
 
-from . import configs, instructions, packages
+from . import configs, instructions, packages, unattended
 from .context import Context
 from .jsonfile import read_json
 from .paths import MARKER, overlay_root
@@ -21,21 +21,26 @@ class Step(NamedTuple):
 STEPS = (
     Step("instructions", instructions.apply, instructions.restore),
     Step("mcp-adapter", configs.apply_mcp, configs.restore_mcp),
-    Step("pi-lens", configs.apply_lens, configs.restore_lens),
+    Step("pi-lens", configs.retire_lens, configs.restore_lens),
     Step("open-tui", configs.apply_open_tui, configs.restore_open_tui),
     Step("computer-use", configs.apply_computer_use, configs.restore_computer_use),
     Step("ui", configs.apply_ui, configs.restore_ui),
     Step("herdr-models", configs.apply_herdr_models, configs.restore_herdr_models),
     Step("overlay-models", configs.apply_overlay_models, configs.restore_overlay_models),
+    Step("overlay-trust", configs.apply_overlay_trust, configs.restore_overlay_trust),
     Step("compaction", configs.apply_compaction, configs.restore_compaction),
     # Last to apply and first to restore: pi packages, the tools they need, and the resources ported beside them.
     Step("packages", packages.apply, packages.restore),
 )
 
 
-def install(home: Path, skip_external: bool, force: bool, herdr_root: str | None = None) -> None:
+def install(home: Path, skip_external: bool, force: bool, herdr_root: str | None = None, profile: str | None = None) -> None:
     marker = home / MARKER
-    ctx = Context(home, read_json(marker), skip_external, force, herdr_root, first_install=not marker.exists())
+    state = read_json(marker)
+    # A run without --profile keeps the recorded one, so the scheduled bare install never reverts an unattended box.
+    profile = profile or state.get("profile", unattended.DEFAULT)
+    ctx = Context(home, state, skip_external, force, herdr_root, first_install=not marker.exists(), profile=profile)
+    ctx.state["profile"] = profile
     # The overlay is recorded with the first step's marker save, so a later run without --overlay keeps it.
     if overlay := overlay_root():
         ctx.state["overlay"] = str(overlay)
@@ -52,7 +57,8 @@ def uninstall(home: Path, skip_external: bool) -> None:
     marker = home / MARKER
     if not marker.exists():
         return
-    ctx = Context(home, read_json(marker), skip_external)
+    state = read_json(marker)
+    ctx = Context(home, state, skip_external, profile=state.get("profile", unattended.DEFAULT))
     for step in reversed(STEPS):
         step.restore(ctx)
     marker.unlink()

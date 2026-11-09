@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-ANCHORLOOP_PACKAGE = "npm:pi-anchorloop@2.6.0"
+ANCHORLOOP_PACKAGE = "npm:pi-anchorloop@2.13.0"
 PINS = (ROOT / "scripts/pi_root/pins.py").read_text()
 
 
@@ -106,7 +106,7 @@ esac
     assert ANCHORLOOP_PACKAGE in json.loads((agent / "settings.json").read_text())["packages"]
     assert f"install {STRAW_BOSS}" in calls.read_text().splitlines()
     assert STRAW_BOSS in json.loads((agent / "settings.json").read_text())["packages"]
-    assert "install -g playwriter@0.9.0" in npm_calls.read_text().splitlines()
+    assert "install -g playwriter@0.10.0" in npm_calls.read_text().splitlines()
     pi_from_npm = "install -g @earendil-works/pi-coding-agent@latest"
     assert npm_calls.read_text().splitlines().count(pi_from_npm) == 1
     # A pi from pi's own installer stays the only pi: no npm copy is added beside it.

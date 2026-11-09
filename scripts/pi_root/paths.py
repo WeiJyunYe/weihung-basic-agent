@@ -24,7 +24,7 @@ TTT_PREFIX = Path(".local/share/weihung-agent-root/team-toon-tack")
 PI_SKILLS_GIT = os.environ.get("PI_SKILLS_GIT", "https://github.com/badlogic/pi-skills.git")
 PI_SKILLS_CLONE = Path(".local/share/weihung-agent-root/pi-skills")
 # An overlay is a second checkout layered over this one: its skills/ directory is linked beside ours, its pi/AGENTS.append.md
-# is appended to the generated AGENTS.md, its pi/models.json providers are merged into ~/.pi/agent/models.json, and its
+# is appended to the generated AGENTS.md, its pi/models.json providers are merged into ~/.pi/agent/models.json, its pi/trust.json directories are marked trusted, and its
 # overlay.json may declare optional plugins. install.sh --overlay sets the variable.
 OVERLAY_VARIABLE = "WEIHUNG_OVERLAY"
 
@@ -37,6 +37,11 @@ def overlay_root() -> Path | None:
 def saved_overlay(home: Path) -> str | None:
     """The overlay the last install recorded in the marker, or None when it ran without one."""
     return read_json(home / MARKER).get("overlay")
+
+
+def saved_profile(home: Path) -> str | None:
+    """The install profile the last install recorded in the marker, or None before the profile existed."""
+    return read_json(home / MARKER).get("profile")
 
 
 def optional_plugins() -> dict[str, tuple[str, str, Path]]:

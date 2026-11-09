@@ -34,7 +34,6 @@ MANUAL_PINS = {"pi-herdr-agents", "pi-herdr-roles"}
 FORK_BRANCHES = {
     "github.com/wayne930242/pi-claude-bridge": "weihung-integration",
     "github.com/wayne930242/pi-herdr-agents": "weihung/v3-integration",
-    "github.com/wayne930242/pi-lens": "feat/dispatch-disabled-runners",
 }
 STATE_DIR = Path.home() / ".local/state/weihung-agent-root"
 STATE_FILE = STATE_DIR / "pi-autoupdate.json"
@@ -86,7 +85,7 @@ def collect_pins() -> list[Pin]:
             pins.append(Pin("npm", match[1], match[2]))
         elif match := GIT_PIN.match(source):
             pins.append(Pin("git", match[1], match[2]))
-    for plain in (target.PLAYWRITER, target.THESIS_TOOLKIT):
+    for plain in (target.PLAYWRITER,):
         if match := PLAIN_NPM_PIN.match(plain):
             pins.append(Pin("npm", match[1], match[2]))
     return pins
@@ -356,6 +355,8 @@ def launchctl(*args: str, check: bool = True) -> None:
 
 
 def schedule() -> None:
+    if sys.platform != "darwin":
+        raise ValueError("schedule is macOS only (launchd): on this machine updates come from the provisioning playbook")
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     LAUNCHD_PLIST.parent.mkdir(parents=True, exist_ok=True)
     LAUNCHD_PLIST.write_bytes(plistlib.dumps(launchd_plist()))

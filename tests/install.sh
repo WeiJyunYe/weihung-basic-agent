@@ -102,14 +102,14 @@ with tempfile.TemporaryDirectory() as directory:
     registry = [source.removeprefix("npm:") for source in sources if source.startswith("npm:")]
     assert registry and all("@" in name[1:] for name in registry), registry
     assert {"source": "npm:@sherif-fanous/pi-catppuccin@0.3.0", "themes": ["themes/catppuccin-mocha.json"]} in settings["packages"], settings
-    assert "npm:@juicesharp/rpiv-todo@2.15.0" in sources and "npm:cc-safety-net@2.7.1" in sources, sources
-    assert "npm:pi-codex-image-gen@0.3.0" in sources and "npm:pi-web-access@0.46.0" in sources, sources
-    assert "npm:pi-robot-hand@0.4.0" in sources and not any("pi-secret-drop" in source for source in sources), sources
+    assert "npm:@juicesharp/rpiv-todo@2.15.0" in sources and "npm:cc-safety-net@2.7.6" in sources, sources
+    assert "npm:pi-codex-image-gen@0.3.1" in sources and "npm:pi-web-access@0.47.0" in sources, sources
+    assert "npm:pi-robot-hand@0.5.5" in sources and not any("pi-secret-drop" in source for source in sources), sources
     assert not any("pi-phoenix-otel" in source for source in sources), sources
-    assert "npm:@pify/memory@0.14.0" in sources, sources
+    assert "npm:@pify/memory@0.14.1" in sources, sources
     assert "npm:pi-loop-monitor@0.2.8" in sources, sources
-    assert "npm:@narumitw/pi-goal@0.54.13" in sources, sources
-    assert {"source": "npm:pi-code@1.6.1", "extensions": ["extensions/claude-rules.ts"]} in settings["packages"], settings
+    assert "npm:@narumitw/pi-goal@0.55.0" in sources, sources
+    assert {"source": "npm:pi-code@1.7.0", "extensions": ["extensions/claude-rules.ts"]} in settings["packages"], settings
     assert not any("pi-todo" in source or "pi-curated-themes" in source for source in sources), sources
     assert not {"defaultProvider", "defaultModel", "defaultThinkingLevel", "enabledModels"} & set(settings), settings
     assert settings["theme"] == "catppuccin-mocha", settings
@@ -119,14 +119,13 @@ with tempfile.TemporaryDirectory() as directory:
     assert settings["terminal"]["showTerminalProgress"] is True, settings
     assert settings["terminal"]["images"] == "kitty", settings
     assert settings["compaction"] == {"modelOverrides": {"claude-bridge/claude-opus-5-5": {"reserveTokens": 500000}, "claude-bridge/claude-sonnet-5-5": {"reserveTokens": 500000}}}, settings
-    assert "powerline" not in settings and "npm:pi-open-tui@0.3.14" in settings["packages"], settings
+    assert "powerline" not in settings and "npm:pi-open-tui@0.4.3" in settings["packages"], settings
     mcp = json.loads((home / ".pi/agent/mcp-adapter.json").read_text())
     assert mcp["settings"] == {"hostConfigDiscovery": "on", "namespaceProxyTools": False}, mcp
     assert mcp["mcpServers"]["codebase-memory-mcp"] == {"command": str(home.resolve() / ".local/bin/codebase-memory-mcp")}, mcp
-    assert mcp["mcpServers"]["research-hub"]["args"] == ["-y", "thesis-toolkit@0.1.3", "mcp", "research-hub"], mcp
-    assert set(mcp["mcpServers"]) == {"codebase-memory-mcp", "research-hub"}, mcp
-    lens = json.loads((home / ".pi-lens/config.json").read_text())
-    assert lens == {"tools": {name: {"enabled": False} for name in ("project_report", "symbol_search", "module_report")}, "dispatch": {"disabledRunners": ["dotnet-build"]}}, lens
+    assert set(mcp["mcpServers"]) == {"codebase-memory-mcp"}, mcp
+    assert not (home / ".pi-lens/config.json").exists(), "pi-lens is retired"
+    assert not any("pi-lens" in str(package) for package in settings["packages"]), settings
     open_tui = json.loads((home / ".pi/agent/open-tui.json").read_text())
     assert open_tui == {"footerSegments": {"runtime": False, "cost": False}}, open_tui
     config = json.loads((home / ".pi/agent/herdr-agents/config.json").read_text())
@@ -248,13 +247,12 @@ with tempfile.TemporaryDirectory() as directory:
     installed_packages = json.loads((agent / "settings.json").read_text())["packages"]
     assert "git:github.com/wayne930242/pi-claude-bridge@old-commit" not in installed_packages, "an earlier revision of a git pin is retired"
     assert BRIDGE_SOURCE in installed_packages, installed_packages
-    assert [package for package in installed_packages if "pi-lens" in str(package)] == ["git:github.com/wayne930242/pi-lens@96ccbc4d16fce06956bec621a7ff327e1c8545cb"], installed_packages
+    assert not any("pi-lens" in str(package) for package in installed_packages), installed_packages
     assert json.loads((agent / "mcp.json").read_text()) == pi_mcp, "pi's mcp.json stays untouched"
     installed_mcp = json.loads((agent / "mcp-adapter.json").read_text())
     assert installed_mcp["mcpServers"]["codebase-memory-mcp"] == {"command": str(home.resolve() / ".local/bin/codebase-memory-mcp")}, installed_mcp
     assert installed_mcp["settings"]["namespaceProxyTools"] is False, installed_mcp
-    assert json.loads(lens_path.read_text())["tools"]["symbol_search"] == {"enabled": False}
-    assert json.loads(lens_path.read_text())["dispatch"] == {"disabledRunners": ["javac", "dotnet-build"], "runnerTimeoutFloorMs": 5}
+    assert json.loads(lens_path.read_text()) == original_lens, "pi-lens is retired: its config is left as the user had it"
     installed_open_tui = json.loads(open_tui_path.read_text())
     assert installed_open_tui == {"cursorStyle": "bar", "footerSegments": {"cwd": True, "cost": False, "runtime": False}}, installed_open_tui
     repo_models = json.loads((Path(install).resolve().parents[1] / "pi/herdr-agents-models.json").read_text())

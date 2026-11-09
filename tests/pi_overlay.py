@@ -75,6 +75,26 @@ class OverlayTests(unittest.TestCase):
             run_script("uninstall.sh", home, "--skip-external", "--overlay", str(overlay), env=env)
             self.assertEqual(json.loads(models.read_text())["providers"], {"ollama": user})
 
+    def test_overlay_trusted_dirs_merge_into_trust_json_and_restore(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory).resolve()
+            home = base / "home"
+            overlay = make_overlay(base)
+            (overlay / "pi/trust.json").write_text(json.dumps({"trusted": ["~/.herdr/worktrees", "/opt/w"]}))
+            trust = home / ".pi/agent/trust.json"
+            trust.parent.mkdir(parents=True)
+            trust.write_text(json.dumps({"/opt/w": False, "/p": True}))
+            env = {"WEIHUNG_OVERLAY": ""}
+            run_script("install.sh", home, "--skip-external", "--overlay", str(overlay), env=env)
+            worktrees = str(home / ".herdr/worktrees")
+            self.assertEqual(json.loads(trust.read_text()), {"/opt/w": True, "/p": True, worktrees: True})
+            # Dropping a directory puts back its earlier decision.
+            (overlay / "pi/trust.json").write_text(json.dumps({"trusted": ["~/.herdr/worktrees"]}))
+            run_script("install.sh", home, "--skip-external", "--overlay", str(overlay), env=env)
+            self.assertEqual(json.loads(trust.read_text()), {"/opt/w": False, "/p": True, worktrees: True})
+            run_script("uninstall.sh", home, "--skip-external", "--overlay", str(overlay), env=env)
+            self.assertEqual(json.loads(trust.read_text()), {"/opt/w": False, "/p": True})
+
     def test_a_later_run_without_an_overlay_keeps_the_recorded_one(self):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
@@ -149,26 +169,21 @@ class OverlayTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("going-to-sleep exists in both", result.stderr)
 
-    def test_links_into_the_overlay_from_an_earlier_layout_are_repointed(self):
+    def test_the_profile_and_the_overlay_are_both_kept_by_a_bare_run(self):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
             home = base / "home"
             overlay = make_overlay(base)
-            # Before the split, the overlay checkout owned these links and was itself a registered pi package.
-            (home / ".pi/agent").mkdir(parents=True)
-            (home / ".agents/skills").mkdir(parents=True)
-            (home / ".pi/agent/rules").symlink_to(overlay.resolve() / "rules")
-            (home / ".pi/agent/agents").symlink_to(overlay.resolve() / "agents")
-            (home / ".agents/skills/going-to-sleep").symlink_to(overlay.resolve() / "skills/going-to-sleep")
-            (home / ".pi/agent/settings.json").write_text(json.dumps({"packages": [str(overlay.resolve()), "npm:user-package"]}))
-            run_script("install.sh", home, "--skip-external", "--overlay", str(overlay), env={"WEIHUNG_OVERLAY": ""})
-            self.assertEqual((home / ".pi/agent/rules").readlink(), ROOT / "rules")
-            self.assertEqual((home / ".pi/agent/agents").readlink(), ROOT / "agents")
-            self.assertEqual((home / ".agents/skills/going-to-sleep").readlink(), ROOT / "skills/going-to-sleep")
-            packages = json.loads((home / ".pi/agent/settings.json").read_text())["packages"]
-            self.assertNotIn(str(overlay.resolve()), packages)
-            self.assertIn("npm:user-package", packages)
-            self.assertIn(str(ROOT), packages)
+            run_script("install.sh", home, "--skip-external", "--overlay", str(overlay), "--profile", "unattended")
+            run_script("install.sh", home, "--skip-external")
+            marker = json.loads((home / ".pi/agent/.weihung-agent-root.json").read_text())
+            self.assertEqual(marker["profile"], "unattended")
+            self.assertEqual(marker["overlay"], str(overlay.resolve()))
+            text = (home / ".pi/agent/AGENTS.md").read_text()
+            self.assertIn("unattended", text.splitlines()[0])
+            self.assertIn("Overlay-only instruction.", text, "the overlay still appends to the unattended text")
+            run_script("uninstall.sh", home, "--skip-external")
+            self.assertFalse((home / ".pi/agent/.weihung-agent-root.json").exists())
 
 
 if __name__ == "__main__":

@@ -1,28 +1,22 @@
 """Every pinned package source; `scripts/pi-pins.py` rewrites the versions in this file, so it imports nothing."""
 
-BRIDGE_SOURCE = "git:github.com/wayne930242/pi-claude-bridge@9822631a50f0400713d9f769faad670c90b2a33b"
+BRIDGE_SOURCE = "git:github.com/wayne930242/pi-claude-bridge@28b209aba959d459aeced5b7c8b81c322c0fd7f5"
 QUOTAS_SOURCE = "npm:@latentminds/pi-quotas@0.5.0"
-CLAUDE_RULES_SOURCE = "npm:pi-code@1.6.1"
-# Fork pin of giuseppecrj/pi-herdr-agents: upstream v3.3.1 plus PRs #84, #95, and #99, the solutionSpace change of
-# closed PR #87, the macOS process-identity fixes, and the fork-only exit hold that pi/extensions/quota-resume.ts and
-# monitor-hold.ts use (branch weihung/v3-integration).
+CLAUDE_RULES_SOURCE = "npm:pi-code@1.7.0"
+# Fork pin of giuseppecrj/pi-herdr-agents: upstream main (v3.7.2+, which carries #84 and #99) rebased with the
+# solutionSpace change of closed PR #87, grouped-workspace placement, the macOS process-identity and cancel-settle
+# fixes, and the fork-only exit hold that pi/extensions/quota-resume.ts and monitor-hold.ts use (branch weihung/v3-integration).
 # Once upstream releases what this setup needs, return to the npm release: set this to npm:pi-herdr-agents@<version>, drop the PINNED_GIT
 # entry and the FORK_BRANCHES entry in scripts/pi-pins.py, and move "npm:pi-herdr-agents" out of RETIRED_SOURCES.
-HERDR_AGENTS_SOURCE = "git:github.com/wayne930242/pi-herdr-agents@19ba73e7f96c73a028d8657e6291cdc5a3bf830e"
+HERDR_AGENTS_SOURCE = "git:github.com/wayne930242/pi-herdr-agents@6f530b9653db1183ad6e4100b3a34cd5e2427fe8"
 # The pi-herdr-agents v3 role pack: planner, /plan, and /skill:plan. Its orchestrate skill is filtered out because
 # skills/orchestrate owns our trimmed version. Pinned by hand (MANUAL_PINS) since a 0.x bump can change the planner.
 HERDR_ROLES_SOURCE = "npm:pi-herdr-roles@0.1.0"
 HERDR_ROLES_PACKAGE = {"source": HERDR_ROLES_SOURCE, "skills": ["!orchestrate"]}
-# Fork pin of apmantza/pi-lens: upstream master 58c0c95 plus the `dispatch.disabledRunners` config key (branch
-# feat/dispatch-disabled-runners, apmantza/pi-lens#5011), which configs.LENS_DISABLED_RUNNERS needs to keep dotnet-build off.
-# Once upstream releases it, return to npm:pi-lens@<version>, drop the PINNED_GIT and FORK_BRANCHES entries, and take
-# "npm:pi-lens" out of RETIRED_SOURCES.
-LENS_SOURCE = "git:github.com/wayne930242/pi-lens@96ccbc4d16fce06956bec621a7ff327e1c8545cb"
 # Every other revision of a pinned git package, including an unpinned spec, is retired for the current pin.
 PINNED_GIT = {
     BRIDGE_SOURCE: ("git:github.com/wayne930242/pi-claude-bridge@",),
     HERDR_AGENTS_SOURCE: ("git:github.com/wayne930242/pi-herdr-agents",),
-    LENS_SOURCE: ("git:github.com/wayne930242/pi-lens",),
 }
 # Versioned specs keep every machine on the same release; `pi update` skips them, so bump them here.
 # Catppuccin Mocha with only official palette colors, matching Herdr, Ghostty, and SketchyBar; the filter loads Mocha alone.
@@ -31,8 +25,9 @@ THEME_PACKAGE = {"source": "npm:@sherif-fanous/pi-catppuccin@0.3.0", "themes": [
 # pi-curated-themes shipped a catppuccin-mocha with off-palette accents; pi-secret-drop is now part of pi-robot-hand;
 # the npm pi-herdr-agents release is replaced by the fork pin above, and pi must never load both.
 # Straw Boss on pi moved from the straw-boss git repository to the pi-straw-boss npm package;
+# pi-herdr-doc-review gave way to pi-better-show, which registers the same show_doc and so must never load beside it;
 # pi-ask-user gave way to rpiv-ask-user-question, whose answer channel lets pi-straw-boss answer from the browser.
-RETIRED_SOURCES = ("npm:@victor-software-house/pi-curated-themes", "npm:pi-secret-drop", "npm:pi-herdr-agents",
+RETIRED_SOURCES = ("npm:pi-herdr-doc-review", "npm:@victor-software-house/pi-curated-themes", "npm:pi-secret-drop", "npm:pi-herdr-agents",
                    "git:github.com/wayne930242/straw-boss", "npm:pi-ask-user",
                    "git:github.com/wayne930242/pi-quotas",
                    # It kept a full gzip copy of the session on every checkpoint with no retention: 192 GB in a month.
@@ -43,7 +38,9 @@ RETIRED_SOURCES = ("npm:@victor-software-house/pi-curated-themes", "npm:pi-secre
                    "npm:pi-aaaav",
                    # Phoenix traces saw little use; the package and its local Phoenix server were retired.
                    "npm:pi-phoenix-otel",
-                   # The npm pi-lens release is replaced by the fork pin LENS_SOURCE; pi must never load both.
+                   # The pi-lens fork pin gave way to the npm release once upstream shipped its change.
+                   "git:github.com/wayne930242/pi-lens",
+                   # pi-lens ran diagnostics and language servers after every edit and cost too much CPU and memory.
                    "npm:pi-lens")
 # pi-code loads only claude-rules.ts, which reads each project's .claude/rules as Claude Code does;
 # its other extensions duplicate the todo, MCP, subagent, and web packages below.
@@ -52,29 +49,29 @@ PACKAGES = [
     BRIDGE_SOURCE,
     HERDR_AGENTS_SOURCE,
     HERDR_ROLES_PACKAGE,
-    "npm:pi-mcp-adapter@7.0.0",
+    "npm:pi-mcp-adapter@7.0.1",
     "npm:pi-intercom@0.18.1",
     "npm:@juicesharp/rpiv-ask-user-question@2.15.0",
     "npm:@juicesharp/rpiv-todo@2.15.0",
     THEME_PACKAGE,
-    "npm:pi-open-tui@0.3.14",
-    LENS_SOURCE,
+    "npm:pi-open-tui@0.4.3",
     QUOTAS_SOURCE,
     "npm:pi-jev-compaction@1.0.0",
     # prose_watch: an AI-tone check (Jev) on the prose files a writing task arms.
     "npm:pi-prose-watch@0.1.2",
-    "npm:cc-safety-net@2.7.1",
-    "npm:pi-codex-image-gen@0.3.0",
-    "npm:pi-robot-hand@0.4.0",
+    "npm:cc-safety-net@2.7.6",
+    "npm:pi-codex-image-gen@0.3.1",
+    "npm:pi-robot-hand@0.5.5",
     "npm:pi-auto-tab-name@0.2.0",
-    "npm:pi-herdr-doc-review@0.11.2",
+    # show_doc: documents in the browser, answers back as messages; it replaced pi-herdr-doc-review (same tool name).
+    "npm:pi-better-show@0.5.0",
     # web_search, fetch_content, and source_check: web research with provider fallback (kept in this fork; upstream retired it).
-    "npm:pi-web-access@0.46.0",
+    "npm:pi-web-access@0.47.0",
     # Straw Boss coordination in Herdr: opt-in main agents per tab, an on-demand tower per workspace, scoped broadcast.
-    "npm:pi-straw-boss@0.52.0",
-    "npm:@pify/memory@0.14.0",
+    "npm:pi-straw-boss@0.69.1",
+    "npm:@pify/memory@0.14.1",
     "npm:pi-loop-monitor@0.2.8",
-    "npm:@narumitw/pi-goal@0.54.13",
+    "npm:@narumitw/pi-goal@0.55.0",
     # Antigravity (agy) Google login: /login antigravity, plus the google_search and generate_image tools.
     "npm:pi-antigravity@0.11.0",
     # Desktop app control through Accessibility (UIA on Windows), kept headless by configs.COMPUTER_USE_SETTINGS.
@@ -87,11 +84,23 @@ PACKAGES = [
 # panes agents leave in worktree workspaces, removes their clean checkouts, and keeps pinned workspaces (prefix+P).
 HERDR_PLUGINS = (
     ("wayne930242.straw-boss", "wayne930242/pi-straw-boss/herdr-plugin", "v0.50.0", "straw_boss_plugin_preinstalled"),
-    ("wayne930242.straw-boss-reaper", "wayne930242/pi-straw-boss/herdr-reaper", "v0.50.0", "reaper_plugin_preinstalled"),
+    ("wayne930242.straw-boss-reaper", "wayne930242/pi-straw-boss/herdr-reaper", "v0.58.3", "reaper_plugin_preinstalled"),
 )
 # The Playwriter CLI drives the user's own Chrome through its extension; playwriter-relay.ts starts its relay.
-PLAYWRITER = "playwriter@0.9.0"
-# thesis-toolkit launches the research-hub MCP server (literature search, open-access download, bibliography saves).
-THESIS_TOOLKIT = "thesis-toolkit@0.1.3"
+PLAYWRITER = "playwriter@0.10.0"
+# The unattended install profile (scripts/pi_root/unattended.py) leaves these out: packages and skills that need a person at the
+# computer, a desktop, or an interactive login. Names carry no version, so a pin bump never touches them.
+UNATTENDED_DROPS = (
+    "npm:cc-safety-net",
+    "npm:@injaneity/pi-computer-use",
+    "npm:pi-codex-image-gen",
+    "npm:pi-robot-hand",
+    "npm:pi-antigravity",
+    "npm:pi-open-tui",
+    "npm:pi-better-show",
+    "npm:pi-auto-tab-name",
+    "npm:pi-prose-watch",
+)
+UNATTENDED_DROPPED_SKILLS = ("going-to-sleep", "recording-with-obs")
 # anchorloop, the workflow skills and extensions; PI_ANCHORLOOP_ROOT swaps in a checkout for testing.
-ANCHORLOOP_PACKAGE = "npm:pi-anchorloop@2.6.0"
+ANCHORLOOP_PACKAGE = "npm:pi-anchorloop@2.13.0"
