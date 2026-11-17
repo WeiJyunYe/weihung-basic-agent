@@ -7,8 +7,10 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from support.statechart import make_pin
+
 ROOT = Path(__file__).resolve().parent.parent
-ANCHORLOOP_PACKAGE = "npm:pi-anchorloop@2.13.0"
+ANCHORLOOP_PACKAGE = "npm:pi-anchorloop@2.16.8"
 PINS = (ROOT / "scripts/pi_root/pins.py").read_text()
 
 
@@ -19,6 +21,7 @@ def pinned(pattern: str) -> tuple[str, ...]:
 
 
 STRAW_BOSS = pinned(r'"(npm:pi-straw-boss@[^"]+)"')[0]
+AGENT_DESKTOP = pinned(r'AGENT_DESKTOP = "([^"]+)"')[0]
 # Each Herdr plugin as (id, repository path, tag).
 HERDR_PLUGINS = [match[:3] for match in re.findall(r'\("(wayne930242\.[^"]+)", "([^"]+)", "([^"]+)", "([^"]+)"\)', PINS)]
 assert [plugin_id for plugin_id, _, _ in HERDR_PLUGINS] == ["wayne930242.straw-boss", "wayne930242.straw-boss-reaper"], HERDR_PLUGINS
@@ -95,7 +98,7 @@ esac
 """, True)
     env = {**os.environ, "HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}",
            "WEIHUNG_OVERLAY": str(overlay),
-           "TEST_TTT_FIXTURE": str(fixture), "PI_SKILLS_GIT": str(pi_skills), "TEST_NPM_CALLS": str(npm_calls)}
+           "TEST_TTT_FIXTURE": str(fixture), "PI_SKILLS_GIT": str(pi_skills), "TEST_NPM_CALLS": str(npm_calls), **make_pin(base)}
     agent = home / ".pi/agent"
 
     result = run("install.sh", home, env)
@@ -106,7 +109,8 @@ esac
     assert ANCHORLOOP_PACKAGE in json.loads((agent / "settings.json").read_text())["packages"]
     assert f"install {STRAW_BOSS}" in calls.read_text().splitlines()
     assert STRAW_BOSS in json.loads((agent / "settings.json").read_text())["packages"]
-    assert "install -g playwriter@0.10.0" in npm_calls.read_text().splitlines()
+    assert "install -g playwriter@0.12.0" in npm_calls.read_text().splitlines()
+    assert f"install -g {AGENT_DESKTOP}" in npm_calls.read_text().splitlines()
     pi_from_npm = "install -g @earendil-works/pi-coding-agent@latest"
     assert npm_calls.read_text().splitlines().count(pi_from_npm) == 1
     # A pi from pi's own installer stays the only pi: no npm copy is added beside it.
@@ -141,6 +145,7 @@ esac
     result = run("uninstall.sh", home, env)
     assert f"could not run pi remove for {plugin.resolve()}" in result.stderr, result.stderr
     assert "uninstall -g playwriter" in npm_calls.read_text().splitlines()
+    assert "uninstall -g agent-desktop" in npm_calls.read_text().splitlines()
     assert f"remove {ANCHORLOOP_PACKAGE}" in calls.read_text().splitlines()
     assert f"remove {STRAW_BOSS}" in calls.read_text().splitlines()
 

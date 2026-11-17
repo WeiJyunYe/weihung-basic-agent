@@ -6,11 +6,15 @@
     "reviewer": "claude-bridge/claude-opus-5-5",
     "adversarial-reviewer": "claude-bridge/claude-opus-5-5",
     "visual-tester": "claude-bridge/claude-sonnet-5-5",
-    "planner": "claude-bridge/claude-opus-5-5"
+    "planner": "claude-bridge/claude-opus-5-5",
+    "watchdog": "claude-bridge/claude-haiku-5-5"
   },
   "tasks": {
     "coding": [
       "claude-bridge/claude-sonnet-5-5"
+    ],
+    "complex-coding": [
+      "claude-bridge/claude-opus-5-5"
     ],
     "review": [
       "claude-bridge/claude-opus-5-5"
@@ -19,7 +23,7 @@
       "claude-bridge/claude-sonnet-5-5"
     ],
     "docs": [
-      "claude-bridge/claude-haiku-5-5"
+      "antigravity/gemini-4-hydrogen"
     ],
     "qa": [
       "claude-bridge/claude-sonnet-5-5"

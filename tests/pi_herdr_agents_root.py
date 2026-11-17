@@ -7,8 +7,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from support.statechart import make_pin
+
 ROOT = Path(__file__).resolve().parent.parent
-PINNED_SPEC = "git:github.com/wayne930242/pi-herdr-agents@6f530b9653db1183ad6e4100b3a34cd5e2427fe8"
+PINNED_SPEC = "git:github.com/wayne930242/pi-herdr-agents@1a56edea0e103f4b2470f149bbed0eaf3a46eaa3"
 RETIRED_NPM = "npm:pi-herdr-agents@2.0.4"
 VARIABLE = "PI_HERDR_AGENTS_ROOT"
 
@@ -76,7 +78,8 @@ class HerdrAgentsRoot(unittest.TestCase):
         self.assertEqual(herdr_entries(self.home), [str(local)])
         self.assertEqual(state(self.home)["herdr_agents"], str(local))
         self.assertIn(str(local), result.stderr)
-        self.assertIn("agents/", result.stderr)
+        self.assertIn("role pack", result.stderr)
+        self.assertNotIn("agents/", result.stderr)
         self.assertNotIn("herdr_agents_displaced", state(self.home))
 
     def test_rerun_with_the_override_changes_nothing(self):
@@ -219,7 +222,7 @@ if '--prefix' in args:
                            check=True, capture_output=True)
         self.write(bin_dir / "pi", f"#!/bin/sh\necho \"$@\" >> '{self.calls}'\n")
         self.write(bin_dir / "herdr", "#!/bin/sh\nexit 0\n")
-        self.env = {"PI_SKILLS_GIT": str(pi_skills), "WEIHUNG_OVERLAY": ""}
+        self.env = {"PI_SKILLS_GIT": str(pi_skills), "WEIHUNG_OVERLAY": "", **make_pin(self.base)}
 
     @staticmethod
     def write(path, content):

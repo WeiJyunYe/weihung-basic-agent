@@ -25,15 +25,17 @@ NPM_PIN = re.compile(r"^(npm:(?:@[^/@]+/)?[^/@]+)@(.+)$")
 GIT_PIN = re.compile(r"^(git:[^@]+)@([0-9a-f]{7,40})$")
 PLAIN_NPM_PIN = re.compile(r"^([^/@:]+)@(.+)$")
 MAIN_BRANCH = "main"
-# npm pins `auto` leaves alone: bumping pi-herdr-agents or pi-herdr-roles also means re-deriving agents/ from the pack's
-# roles, and a 0.x pi-herdr-roles bump can change the planner role and the /plan skill.
-MANUAL_PINS = {"pi-herdr-agents", "pi-herdr-roles"}
+# npm pins `auto` leaves alone: a pi-herdr-agents bump means checking the role discovery pi-straw-boss's role pack registers on.
+# pi-straw-boss stays auto although it ships the roles (its role pack, since 0.79.0): its release flow runs `/boss roles-check`
+# (the boss's decision, 2026-11-13).
+MANUAL_PINS = {"pi-herdr-agents"}
 # Fork pins follow an integration or PR branch instead of the remote HEAD, so `outdated` and a named `bump` never move
 # them to the default branch. pi-herdr-agents is a fork pin until upstream releases giuseppecrj/pi-herdr-agents#84 and #87;
 # then it returns to the npm release (and `auto` keeps leaving it alone through MANUAL_PINS).
 FORK_BRANCHES = {
     "github.com/wayne930242/pi-claude-bridge": "weihung-integration",
     "github.com/wayne930242/pi-herdr-agents": "weihung/v3-integration",
+    "github.com/wayne930242/pi-antigravity": "weihung-integration",
 }
 STATE_DIR = Path.home() / ".local/state/weihung-agent-root"
 STATE_FILE = STATE_DIR / "pi-autoupdate.json"
@@ -85,7 +87,7 @@ def collect_pins() -> list[Pin]:
             pins.append(Pin("npm", match[1], match[2]))
         elif match := GIT_PIN.match(source):
             pins.append(Pin("git", match[1], match[2]))
-    for plain in (target.PLAYWRITER,):
+    for plain in (target.PLAYWRITER, target.AGENT_DESKTOP, target.TEAM_TOON_TACK):
         if match := PLAIN_NPM_PIN.match(plain):
             pins.append(Pin("npm", match[1], match[2]))
     return pins
@@ -163,9 +165,9 @@ def bump(names: list[str]) -> None:
     if not bumped:
         print("Nothing to bump.")
         return
-    if any(name.endswith(("pi-herdr-agents", "pi-herdr-roles")) for name in bumped):
-        print("pi-herdr-agents or pi-herdr-roles changed: diff the pi-herdr-roles roles/ against our agents/, re-derive any changed role, "
-              "compare its skills/orchestrate with ours, and update the pins quoted in docs/reference.md.")
+    if any(name.endswith("pi-herdr-agents") for name in bumped):
+        print("pi-herdr-agents changed: check that pi-straw-boss's role pack still registers (subagents_list, /boss roles-check) "
+              "and update the pins quoted in docs/reference.md.")
     if not names:
         print("Git pins were left alone; name them explicitly to bump them.")
     print("Review `git diff`, run the tests, then `bash scripts/install.sh` and reload pi.")

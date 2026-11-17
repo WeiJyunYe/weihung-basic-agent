@@ -33,6 +33,26 @@ run_install() {
   HOME="$fake_home" bash "$INSTALL_SCRIPT" --home "$fake_home" --skip-external "$@"
 }
 
+install_removes_retired_agents_link() {
+  local temp_dir
+  temp_dir="$(mktemp -d)"
+  local fake_home="$temp_dir/home"
+
+  mkdir -p "$fake_home/.pi/agent"
+  ln -s "$REPO_ROOT/agents" "$fake_home/.pi/agent/agents"
+  run_install "$fake_home" >/dev/null
+  assert_absent "$fake_home/.pi/agent/agents"
+  ln -s "$temp_dir/moved-checkout/agents" "$fake_home/.pi/agent/agents"
+  run_install "$fake_home" >/dev/null
+  assert_absent "$fake_home/.pi/agent/agents"
+  mkdir -p "$temp_dir/user/agents"
+  ln -s "$temp_dir/user/agents" "$fake_home/.pi/agent/agents"
+  run_install "$fake_home" >/dev/null
+  [[ -L "$fake_home/.pi/agent/agents" ]] || fail "expected the user's own agents link kept"
+
+  rm -rf "$temp_dir"
+}
+
 fresh_install_creates_expected_links() {
   local temp_dir
   temp_dir="$(mktemp -d)"
@@ -47,7 +67,7 @@ fresh_install_creates_expected_links() {
     assert_symlink_target "$fake_home/.agents/skills/$name" "$REPO_ROOT/skills/$name"
   done
   assert_symlink_target "$fake_home/.pi/agent/rules" "$REPO_ROOT/rules"
-  assert_symlink_target "$fake_home/.pi/agent/agents" "$REPO_ROOT/agents"
+  assert_absent "$fake_home/.pi/agent/agents"
   [[ -f "$fake_home/.pi/agent/AGENTS.md" ]] || fail "expected generated pi instructions"
   # The literal tilde is the text the generated instructions contain, not a path to expand.
   # shellcheck disable=SC2088
@@ -71,7 +91,7 @@ from pathlib import Path
 
 install = sys.argv[1]
 sys.path.insert(0, str(Path(install).resolve().parent))
-from pi_root.pins import BRIDGE_SOURCE, HERDR_AGENTS_SOURCE, HERDR_ROLES_PACKAGE, PACKAGES
+from pi_root.pins import BRIDGE_SOURCE, HERDR_AGENTS_SOURCE, PACKAGES
 
 
 def run(home, *args):
@@ -97,19 +117,20 @@ with tempfile.TemporaryDirectory() as directory:
     settings = json.loads((home / ".pi/agent/settings.json").read_text())
     assert len(settings["packages"]) == len(PACKAGES) + 2, settings  # the pinned packages, anchorloop, and this package
     assert settings["packages"][0] == BRIDGE_SOURCE, settings
-    assert settings["packages"][1:3] == [HERDR_AGENTS_SOURCE, HERDR_ROLES_PACKAGE], settings
+    assert settings["packages"][1] == HERDR_AGENTS_SOURCE, settings
+    assert not any("pi-herdr-roles" in (p["source"] if isinstance(p, dict) else p) for p in settings["packages"]), settings
     sources = [package["source"] if isinstance(package, dict) else package for package in settings["packages"]]
     registry = [source.removeprefix("npm:") for source in sources if source.startswith("npm:")]
     assert registry and all("@" in name[1:] for name in registry), registry
     assert {"source": "npm:@sherif-fanous/pi-catppuccin@0.3.0", "themes": ["themes/catppuccin-mocha.json"]} in settings["packages"], settings
-    assert "npm:@juicesharp/rpiv-todo@2.15.0" in sources and "npm:cc-safety-net@2.7.6" in sources, sources
-    assert "npm:pi-codex-image-gen@0.3.1" in sources and "npm:pi-web-access@0.47.0" in sources, sources
-    assert "npm:pi-robot-hand@0.5.5" in sources and not any("pi-secret-drop" in source for source in sources), sources
+    assert "npm:@juicesharp/rpiv-todo@2.15.0" in sources and "npm:cc-safety-net@2.7.14" in sources, sources
+    assert "npm:pi-codex-image-gen@0.3.2" in sources and "npm:pi-web-access@0.48.0" in sources, sources
+    assert "npm:pi-robot-hand@0.8.0" in sources and not any("pi-secret-drop" in source for source in sources), sources
     assert not any("pi-phoenix-otel" in source for source in sources), sources
     assert "npm:@pify/memory@0.14.1" in sources, sources
     assert "npm:pi-loop-monitor@0.2.8" in sources, sources
-    assert "npm:@narumitw/pi-goal@0.55.0" in sources, sources
-    assert {"source": "npm:pi-code@1.7.0", "extensions": ["extensions/claude-rules.ts"]} in settings["packages"], settings
+    assert "npm:@narumitw/pi-goal@0.55.3" in sources, sources
+    assert {"source": "npm:pi-code@1.9.0", "extensions": ["extensions/claude-rules.ts"]} in settings["packages"], settings
     assert not any("pi-todo" in source or "pi-curated-themes" in source for source in sources), sources
     assert not {"defaultProvider", "defaultModel", "defaultThinkingLevel", "enabledModels"} & set(settings), settings
     assert settings["theme"] == "catppuccin-mocha", settings
@@ -119,7 +140,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert settings["terminal"]["showTerminalProgress"] is True, settings
     assert settings["terminal"]["images"] == "kitty", settings
     assert settings["compaction"] == {"modelOverrides": {"claude-bridge/claude-opus-5-5": {"reserveTokens": 500000}, "claude-bridge/claude-sonnet-5-5": {"reserveTokens": 500000}}}, settings
-    assert "powerline" not in settings and "npm:pi-open-tui@0.4.3" in settings["packages"], settings
+    assert "powerline" not in settings and "npm:pi-open-tui@0.4.6" in settings["packages"], settings
     mcp = json.loads((home / ".pi/agent/mcp-adapter.json").read_text())
     assert mcp["settings"] == {"hostConfigDiscovery": "on", "namespaceProxyTools": False}, mcp
     assert mcp["mcpServers"]["codebase-memory-mcp"] == {"command": str(home.resolve() / ".local/bin/codebase-memory-mcp")}, mcp
@@ -128,6 +149,8 @@ with tempfile.TemporaryDirectory() as directory:
     assert not any("pi-lens" in str(package) for package in settings["packages"]), settings
     open_tui = json.loads((home / ".pi/agent/open-tui.json").read_text())
     assert open_tui == {"footerSegments": {"runtime": False, "cost": False}}, open_tui
+    bridge = json.loads((home / ".pi/agent/claude-bridge.json").read_text())
+    assert bridge == {"provider": {"systemPromptPreset": False}}, bridge
     config = json.loads((home / ".pi/agent/herdr-agents/config.json").read_text())
     repo_models = json.loads((Path(install).resolve().parents[1] / "pi/herdr-agents-models.json").read_text())
     assert config == {"status": {"enabled": True}, "panes": {"mode": "split", "direction": "right"}, "models": repo_models}, config
@@ -239,6 +262,9 @@ with tempfile.TemporaryDirectory() as directory:
     open_tui_path = agent / "open-tui.json"
     original_open_tui = {"cursorStyle": "bar", "footerSegments": {"cwd": True, "cost": True}}
     open_tui_path.write_text(json.dumps(original_open_tui))
+    bridge_path = agent / "claude-bridge.json"
+    original_bridge = {"startupNoticeShown": "2026-09-25", "provider": {"reportApiCost": True, "systemPromptPreset": True}}
+    bridge_path.write_text(json.dumps(original_bridge))
     config = agent / "herdr-agents/config.json"
     config.parent.mkdir(parents=True, exist_ok=True)
     original_models = {"default": "user/model", "agents": {"scout": "user/scout"}}
@@ -255,6 +281,8 @@ with tempfile.TemporaryDirectory() as directory:
     assert json.loads(lens_path.read_text()) == original_lens, "pi-lens is retired: its config is left as the user had it"
     installed_open_tui = json.loads(open_tui_path.read_text())
     assert installed_open_tui == {"cursorStyle": "bar", "footerSegments": {"cwd": True, "cost": False, "runtime": False}}, installed_open_tui
+    installed_bridge = json.loads(bridge_path.read_text())
+    assert installed_bridge == {"startupNoticeShown": "2026-09-25", "provider": {"reportApiCost": True, "systemPromptPreset": False}}, installed_bridge
     repo_models = json.loads((Path(install).resolve().parents[1] / "pi/herdr-agents-models.json").read_text())
     assert json.loads(config.read_text())["models"] == repo_models, "--force replaces the user's herdr-agents models"
     assert json.loads((agent / "settings.json").read_text())["enabledModels"] == ["user/model"], "pi's model settings are the user's"
@@ -271,6 +299,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert json.loads((agent / "mcp.json").read_text()) == pi_mcp
     assert json.loads(lens_path.read_text()) == original_lens
     assert json.loads(open_tui_path.read_text()) == original_open_tui
+    assert json.loads(bridge_path.read_text()) == original_bridge
     assert settings["terminal"] == {"showImages": False}, settings
     assert settings["powerline"] == {"welcome": False}, settings
     assert settings["compaction"] == {"keepRecentTokens": 30000, "modelOverrides": {"user/big": {"reserveTokens": 1}}}, settings
@@ -280,6 +309,7 @@ PY
 
 run_all_tests() {
   fresh_install_creates_expected_links
+  install_removes_retired_agents_link
   install_is_idempotent_and_writes_pi_settings
   target_option_is_rejected
   conflict_without_force_fails

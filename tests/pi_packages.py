@@ -10,8 +10,9 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from pi_root import external, packages, steps
+from pi_root import external, packages, resources, steps
 from support.pi import fake_npm_install, run_script
+from support.statechart import make_pin
 
 
 class PackageTests(unittest.TestCase):
@@ -34,7 +35,7 @@ class PackageTests(unittest.TestCase):
             with mock.patch.dict("os.environ", unset, clear=True):
                 run_script("install.sh", home, "--skip-external")
             installed = json.loads((agent / "settings.json").read_text())["packages"]
-            self.assertEqual([item for item in installed if "aaaav" in item or "anchorloop" in item], ["npm:pi-anchorloop@2.13.0"])
+            self.assertEqual([item for item in installed if "aaaav" in item or "anchorloop" in item], ["npm:pi-anchorloop@2.16.8"])
 
     def test_the_pi_aaaav_package_gives_way_to_pi_anchorloop(self):
         earlier = "npm:pi-aaaav@1.3.4"
@@ -48,7 +49,7 @@ class PackageTests(unittest.TestCase):
             with mock.patch.dict("os.environ", unset, clear=True):
                 run_script("install.sh", home, "--skip-external")
             installed = json.loads((agent / "settings.json").read_text())["packages"]
-            self.assertEqual([item for item in installed if "aaaav" in item or "anchorloop" in item], ["npm:pi-anchorloop@2.13.0"])
+            self.assertEqual([item for item in installed if "aaaav" in item or "anchorloop" in item], ["npm:pi-anchorloop@2.16.8"])
 
     def test_an_aaaav_git_install_the_state_never_recorded_is_removed_too(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -61,7 +62,7 @@ class PackageTests(unittest.TestCase):
             with mock.patch.dict("os.environ", unset, clear=True):
                 run_script("install.sh", home, "--skip-external")
             installed = json.loads((agent / "settings.json").read_text())["packages"]
-            self.assertEqual([item for item in installed if "aaaav" in item or "anchorloop" in item], ["npm:pi-anchorloop@2.13.0"])
+            self.assertEqual([item for item in installed if "aaaav" in item or "anchorloop" in item], ["npm:pi-anchorloop@2.16.8"])
 
     def test_session_hoarder_leaves_a_machine_that_already_installed_it(self):
         hoarder = "npm:@moyai/pi-session-hoarder@0.2.0"
@@ -99,7 +100,7 @@ class PackageTests(unittest.TestCase):
                 self.assertEqual(packages.anchorloop_source(), str(checkout.resolve()))
         unset = {key: value for key, value in os.environ.items() if key != "PI_ANCHORLOOP_ROOT"}
         with mock.patch.dict("os.environ", unset, clear=True):
-            self.assertEqual(packages.anchorloop_source(), "npm:pi-anchorloop@2.13.0")
+            self.assertEqual(packages.anchorloop_source(), "npm:pi-anchorloop@2.16.8")
 
     def test_leaving_a_checkout_override_removes_the_checkout(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -112,13 +113,13 @@ class PackageTests(unittest.TestCase):
             (agent / "settings.json").write_text("{}")
             run_script("install.sh", home, "--skip-external", env={"PI_ANCHORLOOP_ROOT": str(checkout)})
             first = json.loads((agent / "settings.json").read_text())["packages"]
-            self.assertNotIn("npm:pi-anchorloop@2.13.0", first)
+            self.assertNotIn("npm:pi-anchorloop@2.16.8", first)
             self.assertTrue(any("anchorloop" in item for item in first), first)
             unset = {key: value for key, value in os.environ.items() if key != "PI_ANCHORLOOP_ROOT"}
             with mock.patch.dict("os.environ", unset, clear=True):
                 run_script("install.sh", home, "--skip-external")
             second = json.loads((agent / "settings.json").read_text())["packages"]
-            self.assertEqual([item for item in second if "anchorloop" in item], ["npm:pi-anchorloop@2.13.0"])
+            self.assertEqual([item for item in second if "anchorloop" in item], ["npm:pi-anchorloop@2.16.8"])
 
     def test_previous_git_bridge_revision_is_restored(self):
         old = "git:github.com/wayne930242/pi-claude-bridge@old-commit"
@@ -196,7 +197,8 @@ class PackageTests(unittest.TestCase):
                 if args[:2] == ["pi", "remove"]:
                     removals.append(args[2])
 
-            with mock.patch.object(external, "run", fake_run), mock.patch.object(external, "require"):
+            with mock.patch.object(external, "run", fake_run), mock.patch.object(external, "require"), \
+                    mock.patch.object(resources, "install_statechart"):
                 steps.install(home, skip_external=False, force=False)
             self.assertNotIn(old, json.loads(settings.read_text())["packages"])
             self.assertNotIn(old, removals)
@@ -223,7 +225,8 @@ class PackageTests(unittest.TestCase):
                     current.setdefault("packages", []).append(args[2])
                     settings.write_text(json.dumps(current))
 
-            with mock.patch.object(external, "run", fake_run), mock.patch.object(external, "require"):
+            with mock.patch.object(external, "run", fake_run), mock.patch.object(external, "require"), \
+                    mock.patch.object(resources, "install_statechart"):
                 steps.install(home, skip_external=False, force=False)
             self.assertEqual(uninstalled, [["pi-phoenix-otel", "--prefix", str(agent / "npm"), "--legacy-peer-deps"]])
             self.assertFalse(quotas.exists())
@@ -237,35 +240,74 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(len(PACKAGES) - len(headless), len(UNATTENDED_DROPS), "every drop names a pinned package")
         self.assertEqual(packages.profile_dropped({}), [])
 
-    def test_switching_to_unattended_removes_the_dropped_packages_and_the_ported_resources(self):
+    def fake_install_run(self, settings: Path, removed: list[str]):
+        real_run = external.run
+
+        def fake_run(args, home):
+            if args[0] == "npm":
+                fake_npm_install(args)
+            if args[0] in ("git", "curl") and args[:2] != ["git", "clone"]:
+                real_run(args, home)
+            if args[:2] == ["git", "clone"]:
+                Path(args[-1]).joinpath(".git").mkdir(parents=True)
+            if args[:2] == ["pi", "install"]:
+                current = json.loads(settings.read_text()) if settings.exists() else {}
+                current.setdefault("packages", []).append(args[2])
+                settings.parent.mkdir(parents=True, exist_ok=True)
+                settings.write_text(json.dumps(current))
+            if args[:2] == ["pi", "remove"]:
+                removed.append(args[2])
+                current = json.loads(settings.read_text())
+                current["packages"] = [value for value in current["packages"] if value != args[2]]
+                settings.write_text(json.dumps(current))
+        return fake_run
+
+    @staticmethod
+    def fake_capture(args, home, real_capture=external.capture):
+        """Herdr and pi report nothing; git reports for real, since the statechart source is checked out by revision."""
+        return real_capture(args, home) if args[0] == "git" else ""
+
+    def assert_ttt_without_pi_skills(self, home: Path):
+        agent = home / ".pi/agent"
+        marker = json.loads((agent / ".weihung-agent-root.json").read_text())
+        self.assertTrue((home / ".local/bin/ttt").is_symlink(), "ttt stays for Linear on an unattended computer")
+        self.assertTrue((agent / "skills/managing-linear-tasks/SKILL.md").is_file())
+        self.assertFalse((agent / "skills/pi-skills").exists() or (agent / "skills/pi-skills").is_symlink())
+        self.assertFalse((home / ".local/share/weihung-agent-root/pi-skills").exists())
+        self.assertNotIn("pi_skills_clone", marker)
+        self.assertIn("ttt_prefix", marker)
+        self.assertNotIn(".pi/agent/skills/pi-skills", marker["ported_resources"])
+        self.assertFalse((home / ".agents/skills/statechart").is_symlink())
+        self.assertFalse((home / ".local/share/weihung-agent-root/statechart").exists())
+        self.assertNotIn("statechart_root", marker)
+        self.assertNotIn(".agents/skills/statechart", marker["ported_resources"])
+
+    def test_switching_to_unattended_removes_the_dropped_packages_pi_skills_and_statechart_but_keeps_ttt(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)
             settings = home / ".pi/agent/settings.json"
             removed = []
-
-            def fake_run(args, _home):
-                if args[0] == "npm":
-                    fake_npm_install(args)
-                if args[:2] == ["pi", "install"]:
-                    current = json.loads(settings.read_text()) if settings.exists() else {}
-                    current.setdefault("packages", []).append(args[2])
-                    settings.parent.mkdir(parents=True, exist_ok=True)
-                    settings.write_text(json.dumps(current))
-                if args[:2] == ["pi", "remove"]:
-                    removed.append(args[2])
-                    current = json.loads(settings.read_text())
-                    current["packages"] = [value for value in current["packages"] if value != args[2]]
-                    settings.write_text(json.dumps(current))
-
-            with mock.patch.object(external, "run", fake_run), mock.patch.object(external, "require"), \
-                    mock.patch.object(external, "capture", lambda *_: ""):
+            with mock.patch.dict(os.environ, make_pin(home)), \
+                    mock.patch.object(external, "run", self.fake_install_run(settings, removed)), \
+                    mock.patch.object(external, "require"), mock.patch.object(external, "capture", self.fake_capture):
                 steps.install(home, skip_external=False, force=False)
-                self.assertTrue((home / ".local/bin/ttt").is_symlink())
+                self.assertTrue((home / ".pi/agent/skills/pi-skills").is_symlink())
+                self.assertTrue((home / ".agents/skills/statechart/SKILL.md").is_file())
                 steps.install(home, skip_external=False, force=False, profile="unattended")
-            self.assertIn("npm:cc-safety-net@2.7.6", removed)
-            self.assertNotIn("npm:pi-robot-hand@0.5.5", json.loads(settings.read_text())["packages"])
-            self.assertFalse((home / ".local/bin/ttt").exists(), "ported resources leave with the switch")
-            self.assertNotIn("ported_resources", json.loads((home / ".pi/agent/.weihung-agent-root.json").read_text()))
+            self.assertIn("npm:cc-safety-net@2.7.14", removed)
+            self.assertNotIn("npm:pi-robot-hand@0.8.0", json.loads(settings.read_text())["packages"])
+            self.assert_ttt_without_pi_skills(home)
+
+    def test_a_fresh_unattended_install_brings_ttt_and_no_pi_skills(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            settings = home / ".pi/agent/settings.json"
+            with mock.patch.dict(os.environ, make_pin(home)), \
+                    mock.patch.object(external, "run", self.fake_install_run(settings, [])), \
+                    mock.patch.object(external, "require"), mock.patch.object(external, "capture", self.fake_capture):
+                steps.install(home, skip_external=False, force=False, profile="unattended")
+                steps.install(home, skip_external=False, force=False, profile="unattended")
+            self.assert_ttt_without_pi_skills(home)
 
     def test_an_external_install_without_herdr_on_path_fails_before_installing_anything(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -276,6 +318,27 @@ class PackageTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "herdr is not on PATH"):
                     steps.install(home, skip_external=False, force=False)
             self.assertEqual(calls, [])
+
+    def test_team_toon_tack_installs_its_pinned_version_and_the_pin_tool_tracks_it(self):
+        import importlib.util
+        from pi_root import resources
+        from pi_root.pins import TEAM_TOON_TACK
+        self.assertRegex(TEAM_TOON_TACK, r"^team-toon-tack@\d+\.\d+\.\d+$")
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            calls = []
+
+            def fake_run(args, _home):
+                calls.append(args)
+                fake_npm_install(args)
+
+            with mock.patch.object(external, "run", fake_run):
+                resources.install_ttt(home, {}, force=False)
+        self.assertEqual([args[-1] for args in calls if args[:2] == ["npm", "install"]], [TEAM_TOON_TACK])
+        spec = importlib.util.spec_from_file_location("pi_pins", Path(__file__).resolve().parents[1] / "scripts/pi-pins.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertIn("team-toon-tack", [pin.name for pin in module.collect_pins()])
 
     def test_the_update_schedule_refuses_outside_macos(self):
         import importlib.util

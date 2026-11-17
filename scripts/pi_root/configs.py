@@ -1,4 +1,4 @@
-"""The small managed settings: UI, terminal, panes, herdr-agents models, built-in MCP, mcp-adapter, open-tui, computer use, compaction."""
+"""The small managed settings: UI, terminal, panes, herdr-agents models, built-in MCP, mcp-adapter, open-tui, claude-bridge, computer use, compaction."""
 
 import hashlib
 import os
@@ -9,7 +9,7 @@ from .context import Context, State
 from .jsonfile import read_json, write_json
 from .managed import record_keys, remember_keys, restore_keys, restore_nested, restore_value
 from . import unattended
-from .paths import COMPUTER_USE_CONFIG, HERDR_MODELS, LENS_CONFIG, OPEN_TUI_CONFIG, RETIRED_ROLES_DIR, overlay_root
+from .paths import CLAUDE_BRIDGE_CONFIG, COMPUTER_USE_CONFIG, HERDR_MODELS, HERDR_MODELS_UNATTENDED, LENS_CONFIG, OPEN_TUI_CONFIG, RETIRED_ROLES_DIR, overlay_root
 
 # pi's native compaction fires at contextWindow - reserveTokens: 500K for the 1M Opus and Sonnet, a
 # ceiling for a long running turn; idle-compaction.ts compacts at 300K between turns.
@@ -32,8 +32,7 @@ BUILTIN_MCP_OFF = "-builtin:mcp"
 HERDR_STATUS = {"enabled": True}
 # pi-open-tui footer segments kept off to keep the footer to what gets read; `/open-tui` still owns every other setting.
 OPEN_TUI_HIDDEN_SEGMENTS = ("runtime", "cost")
-# pi-computer-use stays in the background: no raw input, focus change, or cursor takeover, so it never fights the user
-# for the machine; `/computer-use` shows the active config, and a project .pi/computer-use.json can still override it.
+# The key an earlier install set in pi-computer-use's config (retired for agent-desktop); retire_computer_use gives it back.
 COMPUTER_USE_SETTINGS = {"headless": True}
 
 
@@ -104,16 +103,22 @@ def retire_model_profile(ctx: Context) -> None:
         state.pop(key, None)
 
 
+def models_source(ctx: Context):
+    return HERDR_MODELS_UNATTENDED if unattended.is_unattended(ctx.profile) else HERDR_MODELS
+
+
 def apply_herdr_models(ctx: Context) -> None:
-    """Write pi/herdr-agents-models.json as the pi-herdr-agents `models`; a hand edit since the last install stops the run."""
+    """Write pi/herdr-agents-models.json (pi/herdr-agents-models.unattended.json for the unattended install profile) as the
+    pi-herdr-agents `models`; a hand edit since the last install stops the run."""
     retire_model_profile(ctx)
     state = ctx.state
     config = read_json(ctx.herdr_config_path)
-    desired = read_json(HERDR_MODELS)
+    source = models_source(ctx)
+    desired = read_json(source)
     current = config.get("models")
     edited = current not in (None, desired, state.get("installed_herdr_models"))
     if edited and not ctx.force:
-        raise ValueError(f"{ctx.herdr_config_path} `models` differs from {HERDR_MODELS}; move the change into the "
+        raise ValueError(f"{ctx.herdr_config_path} `models` differs from {source}; move the change into the "
                          "repository file, or rerun with --force to replace it")
     state.setdefault("previous_herdr_models", deepcopy(current))
     config["models"] = desired
@@ -338,17 +343,13 @@ def restore_open_tui(ctx: Context) -> None:
         path.unlink()
 
 
-def apply_computer_use(ctx: Context) -> None:
-    if unattended.is_unattended(ctx.profile):
-        return
+def retire_computer_use(ctx: Context) -> None:
+    """pi-computer-use is retired: give back its config file as it was before an earlier install set `headless`."""
     state = ctx.state
-    path = ctx.home / COMPUTER_USE_CONFIG
-    config = read_json(path)
-    state.setdefault("previous_computer_use_file_present", path.exists())
-    remember_keys(state, "computer_use", config, COMPUTER_USE_SETTINGS)
-    config.update(deepcopy(COMPUTER_USE_SETTINGS))
-    write_json(path, config)
-    record_keys(state, "computer_use", config, COMPUTER_USE_SETTINGS)
+    if "installed_computer_use" in state:
+        restore_computer_use(ctx)
+    for key in ("previous_computer_use", "previous_computer_use_present", "installed_computer_use", "previous_computer_use_file_present"):
+        state.pop(key, None)
 
 
 def restore_computer_use(ctx: Context) -> None:
@@ -361,6 +362,37 @@ def restore_computer_use(ctx: Context) -> None:
     if config or state.get("previous_computer_use_file_present", True):
         write_json(path, config)
     else:
+        path.unlink()
+
+
+# pi-claude-bridge sends Claude Code's system prompt preset ahead of pi's own unless provider.systemPromptPreset is false;
+# pi's prompt alone is the whole system prompt on every machine and profile (the boss's decision, 2026-11-16).
+CLAUDE_BRIDGE_PROVIDER = {"systemPromptPreset": False}
+
+
+def apply_claude_bridge(ctx: Context) -> None:
+    state = ctx.state
+    path = ctx.home / CLAUDE_BRIDGE_CONFIG
+    config = read_json(path)
+    state.setdefault("previous_claude_bridge_present", path.exists())
+    provider = config.setdefault("provider", {})
+    state.setdefault("previous_claude_bridge_provider", {key: provider[key] for key in CLAUDE_BRIDGE_PROVIDER if key in provider})
+    provider.update(CLAUDE_BRIDGE_PROVIDER)
+    write_json(path, config)
+    state["installed_claude_bridge_provider"] = deepcopy(CLAUDE_BRIDGE_PROVIDER)
+
+
+def restore_claude_bridge(ctx: Context) -> None:
+    state = ctx.state
+    path = ctx.home / CLAUDE_BRIDGE_CONFIG
+    if "installed_claude_bridge_provider" not in state:
+        return
+    config = read_json(path)
+    restore_nested(config, "provider", state["installed_claude_bridge_provider"],
+                   state.get("previous_claude_bridge_provider"), tuple(CLAUDE_BRIDGE_PROVIDER))
+    if config or state.get("previous_claude_bridge_present", True):
+        write_json(path, config)
+    elif path.exists():
         path.unlink()
 
 

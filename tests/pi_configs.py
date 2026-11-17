@@ -42,23 +42,36 @@ class ConfigTests(unittest.TestCase):
                 run_script("uninstall.sh", home, "--skip-external")
                 self.assertEqual(json.loads(settings.read_text()).get("extensions"), before)
 
-    def test_computer_use_runs_headless_and_uninstall_restores_the_user_file(self):
+    def test_retired_computer_use_config_gets_back_what_an_earlier_install_replaced(self):
+        # (file before the earlier install, or None when it had none)
         for before in (None, {"browser_use": False}, {"headless": False, "cursor_overlay": True}):
             with self.subTest(before=before), tempfile.TemporaryDirectory() as directory:
                 home = Path(directory)
-                path = home / ".pi/agent/extensions/pi-computer-use.json"
-                if before is not None:
-                    path.parent.mkdir(parents=True)
-                    path.write_text(json.dumps(before))
-                run_script("install.sh", home, "--skip-external")
-                self.assertEqual(json.loads(path.read_text()), {**(before or {}), "headless": True})
-                run_script("install.sh", home, "--skip-external")
-                self.assertEqual(json.loads(path.read_text()), {**(before or {}), "headless": True})
-                run_script("uninstall.sh", home, "--skip-external")
+                agent = home / ".pi/agent"
+                path = agent / "extensions/pi-computer-use.json"
+                path.parent.mkdir(parents=True)
+                path.write_text(json.dumps({**(before or {}), "headless": True}))
+                marker = agent / ".weihung-agent-root.json"
+                marker.write_text(json.dumps({
+                    "previous_computer_use": {"headless": (before or {}).get("headless")},
+                    "previous_computer_use_present": ["headless"] if before and "headless" in before else [],
+                    "installed_computer_use": {"headless": True},
+                    "previous_computer_use_file_present": before is not None}))
+                run_script("install.sh", home, "--skip-external", "--force")
                 if before is None:
                     self.assertFalse(path.exists())
                 else:
                     self.assertEqual(json.loads(path.read_text()), before)
+                self.assertFalse([key for key in json.loads(marker.read_text()) if "computer_use" in key])
+                run_script("install.sh", home, "--skip-external")
+                self.assertEqual(path.exists(), before is not None, "a later install leaves the file alone")
+
+    def test_a_fresh_install_writes_no_computer_use_config(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            run_script("install.sh", home, "--skip-external")
+            self.assertFalse((home / ".pi/agent/extensions/pi-computer-use.json").exists())
+            self.assertTrue((home / ".agents/skills/agent-desktop").is_symlink())
 
     def test_research_hub_is_not_registered_and_an_earlier_install_entry_is_retired(self):
         earlier = {"command": "npx", "args": ["-y", "thesis-toolkit@0.1.3", "mcp", "research-hub"]}
@@ -150,6 +163,23 @@ class HerdrModelsTests(unittest.TestCase):
             self.assertEqual(json.loads(config.read_text())["models"]["agents"]["reviewer"], "user/edited")
             run_script("install.sh", home, "--skip-external", "--force")
             self.assertEqual(json.loads(config.read_text())["models"], self.repo_models)
+
+    def test_the_unattended_profile_writes_its_own_models_without_fable(self):
+        unattended_models = json.loads((ROOT / "pi/herdr-agents-models.unattended.json").read_text())
+        self.assertEqual(unattended_models.keys(), self.repo_models.keys())
+        self.assertEqual(unattended_models["agents"].keys(), self.repo_models["agents"].keys())
+        self.assertEqual(unattended_models["tasks"].keys(), self.repo_models["tasks"].keys())
+        self.assertNotIn("fable", json.dumps(unattended_models))
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            config = home / ".pi/agent/herdr-agents/config.json"
+            run_script("install.sh", home, "--skip-external", "--profile", "unattended")
+            self.assertEqual(json.loads(config.read_text())["models"], unattended_models)
+            run_script("install.sh", home, "--skip-external")
+            self.assertEqual(json.loads(config.read_text())["models"], unattended_models, "a bare run keeps the profile")
+            run_script("install.sh", home, "--skip-external", "--profile", "default")
+            self.assertEqual(json.loads(config.read_text())["models"], self.repo_models)
+
 
 class RemovedModelProfileTests(unittest.TestCase):
     """The model strategy profile was removed on 2026-10-03; models live in pi/herdr-agents-models.json."""

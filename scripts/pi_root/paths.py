@@ -14,15 +14,22 @@ HERDR_AGENTS_ROOT_VARIABLE = "PI_HERDR_AGENTS_ROOT"
 ANCHORLOOP_ROOT_VARIABLE = "PI_ANCHORLOOP_ROOT"
 # The pi-herdr-agents `models` object (role, default, and task models) this repository writes into its config.
 HERDR_MODELS = ROOT / "pi/herdr-agents-models.json"
+# The unattended install profile's role models (Opus where the default routes to Fable: the box's plan has no Fable quota).
+HERDR_MODELS_UNATTENDED = ROOT / "pi/herdr-agents-models.unattended.json"
 # The model strategy profile was removed; its generated tier roles and marker keys are retired on install.
 RETIRED_ROLES_DIR = Path(".pi/agent/herdr-agents/roles")
 LENS_CONFIG = Path(".pi-lens/config.json")
 OPEN_TUI_CONFIG = Path(".pi/agent/open-tui.json")
+CLAUDE_BRIDGE_CONFIG = Path(".pi/agent/claude-bridge.json")
 COMPUTER_USE_CONFIG = Path(".pi/agent/extensions/pi-computer-use.json")
 TTT_PREFIX = Path(".local/share/weihung-agent-root/team-toon-tack")
 # pi-skills ships bare skill directories without a pi manifest; its README installs it as a clone under the skills root.
 PI_SKILLS_GIT = os.environ.get("PI_SKILLS_GIT", "https://github.com/badlogic/pi-skills.git")
 PI_SKILLS_CLONE = Path(".local/share/weihung-agent-root/pi-skills")
+# The pinned statechart skill: a sparse clone of its source, the TLC jar, and the skill folder linked into ~/.agents/skills.
+# PI_STATECHART_PIN names a JSON file that replaces the keys of pins.STATECHART, for the installer tests.
+STATECHART_ROOT = Path(".local/share/weihung-agent-root/statechart")
+STATECHART_PIN_VARIABLE = "PI_STATECHART_PIN"
 # An overlay is a second checkout layered over this one: its skills/ directory is linked beside ours, its pi/AGENTS.append.md
 # is appended to the generated AGENTS.md, its pi/models.json providers are merged into ~/.pi/agent/models.json, its pi/trust.json directories are marked trusted, and its
 # overlay.json may declare optional plugins. install.sh --overlay sets the variable.
